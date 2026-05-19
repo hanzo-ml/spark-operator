@@ -1,125 +1,95 @@
-# Kubeflow Spark Operator
+# Spark Operator
 
-[![GitHub release](https://img.shields.io/github/v/release/kubeflow/spark-operator)](https://github.com/kubeflow/spark-operator/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/spark-operator)](https://goreportcard.com/report/github.com/kubeflow/spark-operator)
-[![Integration Test](https://github.com/kubeflow/spark-operator/actions/workflows/integration.yaml/badge.svg)](https://github.com/kubeflow/spark-operator/actions/workflows/integration.yaml)
-[![Join Slack](https://img.shields.io/badge/Join_Slack-blue?logo=slack)](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/spark-operator)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10524/badge)](https://www.bestpractices.dev/projects/10524)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubeflow%2Fspark-operator.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubeflow%2Fspark-operator?ref=badge_shield&issueType=license)
+Apache Spark workloads on Kubernetes.
 
-## What is Spark Operator?
+A brand-neutral fork in the [hanzo-ml](https://github.com/hanzo-ml)
+organization — the open-source ML lifecycle estate. Branding is
+consumed at runtime from a brand package via the
+[`@<org>/brand`](#brand-package) contract; the same code deploys under
+any white-label brand with zero source changes.
 
-The Kubernetes Operator for Apache Spark aims to make specifying and running [Spark](https://github.com/apache/spark) applications as easy and idiomatic as running other workloads on Kubernetes. It uses
-[Kubernetes custom resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) for specifying, running, and surfacing status of Spark applications.
+## Brand package
 
-## Quick Start
+This fork imports brand configuration from a runtime brand package
+following the contract used across the open-source ML estate. Set
+`BRAND_PACKAGE` to the npm package name; the fork's frontend (where
+applicable) calls `loadBrand()` at boot to hydrate the singleton from
+that package's `brand.json`.
 
-For a more detailed guide, please refer to the [Getting Started guide](https://www.kubeflow.org/docs/components/spark-operator/getting-started/).
+Available brand packages:
+
+| Package | Brand |
+|---|---|
+| `@hanzo/brand` | default / Hanzo AI |
+| `@luxfi/brand` | Lux Finance |
+| `@zooai/brand` | Zoo Labs |
+| `@osage/brand` | Osage |
+| `@parsdao/brand` | Pars DAO |
+| `@cyrusdao/brand` | Cyrus DAO |
+| `@onyx-plus/brand` | Onyx Plus |
+| `@migaprotocol/brand` | Miga Protocol |
+| `@vccross/brand` | VC Cross |
+| `@mlc/brand` | MLC |
+| `@zenlm/brand` | Zen LM |
+
+Or any custom reseller package conforming to the same schema.
+
+## Multi-tenant via IAM
+
+Every request carries a JWT. The brand package's `iam` block specifies:
+
+- `issuer` — JWT issuer URL
+- `jwksUrl` — JWKS endpoint
+- `tenantClaim` — JWT claim with the org/tenant ID (default `org_id`)
+- `tenantHeader` — HTTP header that propagates the validated tenant
+  ID (default `X-Org-Id`)
+
+The tenant ID scopes all storage, queries, and resource ownership.
+Cross-tenant access is forbidden by default.
+
+## Quick start (reseller deployment)
 
 ```bash
-# Add the Helm repository
-helm repo add --force-update spark-operator https://kubeflow.github.io/spark-operator
-
-# Install the operator into the spark-operator namespace and wait for deployments to be ready
-helm install spark-operator spark-operator/spark-operator \
-    --namespace spark-operator \
-    --create-namespace \
-    --wait
-
-# Create an example application in the default namespace
-kubectl apply -f https://raw.githubusercontent.com/kubeflow/spark-operator/refs/heads/master/examples/spark-pi.yaml
-
-# Get the status of the application
-kubectl get sparkapp spark-pi
-
-# Delete the application
-kubectl delete sparkapp spark-pi
+export BRAND_PACKAGE="@<your-org>/brand"   # e.g. @luxfi/brand
 ```
 
-## Overview
+The frontend (this fork's case: `pipelines` ships the React DAG UI;
+the other 7 are read-only reference forks) loads the brand at boot.
+The backend reads the brand package's `iam` block for JWKS + tenant
+configuration.
 
-For a complete reference of the custom resource definitions, please refer to the [API Definition](docs/api-docs.md). For details on its design, please refer to the [Architecture](https://www.kubeflow.org/docs/components/spark-operator/overview/#architecture). It requires Spark 2.3 and above that supports Kubernetes as a native scheduler backend.
+## Role
 
-The Kubernetes Operator for Apache Spark currently supports the following list of features:
+Read-only reference for the Rust operator's `SparkJob` CRD (v0.1.1).
 
-- Supports Spark 2.3 and up.
-- Enables declarative application specification and management of applications through custom resources.
-- Automatically runs `spark-submit` on behalf of users for each `SparkApplication` eligible for submission.
-- Provides native [cron](https://en.wikipedia.org/wiki/Cron) support for running scheduled applications.
-- Supports customization of Spark pods beyond what Spark natively is able to do through the mutating admission webhook, e.g., mounting ConfigMaps and volumes, and setting pod affinity/anti-affinity.
-- Supports automatic application re-submission for updated `SparkApplication` objects with updated specification.
-- Supports automatic application restart with a configurable restart policy.
-- Supports automatic retries of failed submissions with optional linear back-off.
-- Supports collecting and exporting application-level metrics and driver/executor metrics to Prometheus.
+The canonical control plane for the ML lifecycle estate is the Rust
+operator at [`hanzoai/operator`](https://github.com/hanzoai/operator).
+See [HIP-0109](https://github.com/hanzoai/HIPs/blob/main/HIPs/hip-0109-hanzo-ml-cloud-toolkit.md)
+for the lifecycle CRD set.
 
-## Project Status
+## Upstream sync
 
-**Project status:** *beta*
+This fork stays current with upstream via the GitHub merge-upstream
+API. No upstream code is modified in this fork; only the 5 markdown
+files at root are added.
 
-**Current API version:** *`v1beta2`*
+```bash
+gh api -X POST /repos/hanzo-ml/spark-operator/merge-upstream \
+  -f branch=master
+```
 
-**If you are currently using the `v1beta1` version of the APIs in your manifests, please update them to use the `v1beta2` version by changing `apiVersion: "sparkoperator.k8s.io/<version>"` to `apiVersion: "sparkoperator.k8s.io/v1beta2"`. You will also need to delete the `previous` version of the CustomResourceDefinitions named `sparkapplications.sparkoperator.k8s.io` and `scheduledsparkapplications.sparkoperator.k8s.io`, and replace them with the `v1beta2` version either by installing the latest version of the operator or by running `kubectl create -f config/crd/bases`.**
+See [UPSTREAM_README.md](./UPSTREAM_README.md) for the original
+project documentation.
 
-## Prerequisites
+## License
 
-- [Kubernetes](https://kubernetes.io) >= 1.16
-- [Helm](https://helm.sh) >= 3
-- [kubectl](https://kubernetes.io/docs/reference/kubectl) >= 1.16
+Apache-2.0. See [NOTICE](./NOTICE) for attribution.
 
-## Getting Started
+## See also
 
-For getting started with Spark operator, please refer to [Getting Started](https://www.kubeflow.org/docs/components/spark-operator/getting-started/).
-
-## User Guide
-
-For detailed user guide and API documentation, please refer to [User Guide](https://www.kubeflow.org/docs/components/spark-operator/user-guide/) and [API Specification](docs/api-docs.md).
-
-If you plan to run Spark workloads with Spark operator on [Alibaba Cloud Container Service for Kubernetes (ACK)](https://www.alibabacloud.com/product/kubernetes), also refer to the [ACK guide](https://www.alibabacloud.com/help/ack/ack-managed-and-ack-dedicated/use-cases/run-apache-spark-workloads-on-ack) for optimized configuration practices.
-
-If you are running Spark operator on Google Kubernetes Engine (GKE) and want to use Google Cloud Storage (GCS) and/or BigQuery for reading/writing data, also refer to the [GCP guide](https://www.kubeflow.org/docs/components/spark-operator/user-guide/gcp/).
-
-## Blog Posts
-
-- [[2025-03] Announcing the Kubeflow Spark Operator Benchmarking Results](https://blog.kubeflow.org/operators/benchmarking/performance/2025/03/15/kubeflow-spark-operator-benchmarks.html)
-- [[2024-04] Announcing the Kubeflow Spark Operator: Building a Stronger Spark on Kubernetes Community](https://blog.kubeflow.org/operators/2024/04/15/kubeflow-spark-operator.html)
-
-## Version Matrix
-
-The following table lists the most recent few versions of the operator.
-
-| Operator Version      | API Version | Kubernetes Version | Base Spark Version |
-| --------------------- | ----------- | ------------------ | ------------------ |
-| `v2.3.x`              | `v1beta2`   | 1.16+              | `4.0.0`            |
-| `v2.2.x`              | `v1beta2`   | 1.16+              | `3.5.5`            |
-| `v2.1.x`              | `v1beta2`   | 1.16+              | `3.5.3`            |
-| `v2.0.x`              | `v1beta2`   | 1.16+              | `3.5.2`            |
-| `v1beta2-1.6.x-3.5.0` | `v1beta2`   | 1.16+              | `3.5.0`            |
-| `v1beta2-1.5.x-3.5.0` | `v1beta2`   | 1.16+              | `3.5.0`            |
-| `v1beta2-1.4.x-3.5.0` | `v1beta2`   | 1.16+              | `3.5.0`            |
-| `v1beta2-1.3.x-3.1.1` | `v1beta2`   | 1.16+              | `3.1.1`            |
-| `v1beta2-1.2.3-3.1.1` | `v1beta2`   | 1.13+              | `3.1.1`            |
-| `v1beta2-1.2.2-3.0.0` | `v1beta2`   | 1.13+              | `3.0.0`            |
-| `v1beta2-1.2.1-3.0.0` | `v1beta2`   | 1.13+              | `3.0.0`            |
-| `v1beta2-1.2.0-3.0.0` | `v1beta2`   | 1.13+              | `3.0.0`            |
-| `v1beta2-1.1.x-2.4.5` | `v1beta2`   | 1.13+              | `2.4.5`            |
-| `v1beta2-1.0.x-2.4.4` | `v1beta2`   | 1.13+              | `2.4.4`            |
-
-## Developer Guide
-
-For developing with Spark Operator, please refer to [Developer Guide](https://www.kubeflow.org/docs/components/spark-operator/developer-guide/).
-
-## Contributor Guide
-
-For contributing to Spark Operator, please refer to [Contributor Guide](CONTRIBUTING.md).
-
-## Community
-
-- Join the [CNCF Slack Channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels) and then join `#kubeflow-spark-on-kubernetes` Channel.
-- Check out our blog post [Announcing the Kubeflow Spark Operator: Building a Stronger Spark on Kubernetes Community](https://blog.kubeflow.org/operators/2024/04/15/kubeflow-spark-operator.html).
-- Join our monthly community meeting [Kubeflow Spark Operator Meeting Notes](https://bit.ly/3VGzP4n).
-
-## Adopters
-
-Check out [adopters of Spark Operator](ADOPTERS.md).
+- [DESIGN.md](./DESIGN.md) — design system reference (mirrors the brand
+  package's design spec)
+- [BRAND.md](./BRAND.md) — brand package contract and reseller guide
+- [MULTI_TENANT.md](./MULTI_TENANT.md) — tenant isolation contract
+- [HANZO_CHANGES.md](./HANZO_CHANGES.md) — divergence from upstream
+- [HIP-0109 Hanzo ML Cloud Toolkit](https://github.com/hanzoai/HIPs/blob/main/HIPs/hip-0109-hanzo-ml-cloud-toolkit.md)
