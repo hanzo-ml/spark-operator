@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -124,14 +124,14 @@ func (f *sparkPodEventFilter) filter(pod *corev1.Pod) bool {
 
 type EventFilter struct {
 	client           client.Client
-	recorder         record.EventRecorder
+	recorder         events.EventRecorder
 	namespaceMatcher *util.NamespaceMatcher
 	logger           logr.Logger
 }
 
 var _ predicate.Predicate = &EventFilter{}
 
-func NewSparkApplicationEventFilter(client client.Client, recorder record.EventRecorder, namespaces []string, namespaceSelector string) (*EventFilter, error) {
+func NewSparkApplicationEventFilter(client client.Client, recorder events.EventRecorder, namespaces []string, namespaceSelector string) (*EventFilter, error) {
 	matcher, err := util.NewNamespaceMatcher(namespaces, namespaceSelector)
 	if err != nil {
 		return nil, err
@@ -175,13 +175,15 @@ func (f *EventFilter) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	// The spec has changed except for Spec.Suspend.
+	// The spec has changed except for Spec.Suspend and Spec.TimeToLiveSeconds.
 	// This is currently best effort as we can potentially miss updates and end up in an inconsistent state.
 	if !equality.Semantic.DeepEqual(oldApp.Spec, newApp.Spec) {
 
-		// Only Spec.Suspend can be updated without any action
+		// Spec.Suspend and Spec.TimeToLiveSeconds can be updated without invalidating
+		// the running application.
 		oldAppCopy := oldApp.DeepCopy()
 		oldAppCopy.Spec.Suspend = newApp.Spec.Suspend
+		oldAppCopy.Spec.TimeToLiveSeconds = newApp.Spec.TimeToLiveSeconds
 		if equality.Semantic.DeepEqual(oldAppCopy.Spec, newApp.Spec) {
 			return true
 		}
@@ -195,6 +197,7 @@ func (f *EventFilter) Update(e event.UpdateEvent) bool {
 				"name", newApp.Name, "namespace", newApp.Namespace)
 			f.recorder.Eventf(
 				newApp,
+				nil,
 				corev1.EventTypeNormal,
 				"SparkApplicationWebhookFieldsUpdated",
 				"SparkApplication %s webhook-patched fields updated, new pods will use updated values",
@@ -210,6 +213,7 @@ func (f *EventFilter) Update(e event.UpdateEvent) bool {
 			f.logger.Error(err, "Failed to update application status", "application", newApp.Name)
 			f.recorder.Eventf(
 				newApp,
+				nil,
 				corev1.EventTypeWarning,
 				"SparkApplicationSpecUpdateFailed",
 				"Failed to update spec for SparkApplication %s: %v",
@@ -284,9 +288,11 @@ func (f *EventFilter) isWebhookPatchedFieldsOnlyChange(oldApp, newApp *v1beta2.S
 	clearWebhookPatchedExecutorFields(&oldCopy.Spec.Executor)
 	clearWebhookPatchedExecutorFields(&newCopy.Spec.Executor)
 
-	// Also zero out Suspend field as it's handled separately
+	// Also zero out Suspend field and TimeToLiveSeconds as it's handled separately
 	oldCopy.Spec.Suspend = nil
 	newCopy.Spec.Suspend = nil
+	oldCopy.Spec.TimeToLiveSeconds = nil
+	newCopy.Spec.TimeToLiveSeconds = nil
 
 	// If specs are equal after clearing webhook-patched fields,
 	// then only webhook-patched fields changed

@@ -73,6 +73,7 @@ spec:
             - --metrics-prefix=
             - --metrics-labels=app_type
             - --metrics-job-start-latency-buckets=30,60,90,120,150,180,210,240,270,300
+            - --metrics-job-submit-latency-buckets=0.5,1,2,4,8,16,32,64,128,256
             - --leader-election=true
             - --leader-election-lock-name=spark-operator-controller-lock
             - --leader-election-lock-namespace=$(CONTROLLER_NAMESPACE)
@@ -86,7 +87,7 @@ spec:
             - --max-tracked-executor-per-app=1000
             - --kube-api-qps=20
             - --kube-api-burst=30
-            - --feature-gates=PartialRestart=false,LoadSparkDefaults=false
+            - --feature-gates=PartialRestart=false,LoadSparkDefaults=false,RestSubmitter=false
             - --scheduled-spark-application-timestamp-precision=nanos
           env:
             - name: OPERATOR_VERSION
